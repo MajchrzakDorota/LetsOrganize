@@ -1,94 +1,118 @@
 ﻿using LetsOrganize.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using LetsOrganize.Interfaces;
+using LetsOrganize.Models;
+using LetsOrganize.Utils;
+using Microsoft.EntityFrameworkCore;
 
 namespace LetsOrganize.Services
 {
-    public interface IMyListService
-    {
-        Task<IEnumerable<MyList>> GetAllLists();
-        Task<MyList> GetListById(int id);
-        Task<int> CreateList(string name);
-        Task<bool> ChangeListName(int id, string name);
-        Task<bool> DeleteList(int id);
-
-    }
     public class MyListService : IMyListService
     {
         private readonly LetsOrganizeDbContext _context;
-        public MyListService(LetsOrganizeDbContext context)
+        private readonly ILogger<MyListService> _logger;
+
+        public MyListService(LetsOrganizeDbContext context, ILogger<MyListService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
-        public async Task<IEnumerable<MyList>> GetAllLists()
+        public async Task<IEnumerable<MyListDto>> GetAllLists()
         {
-            var lists = _context.Lists.ToList();
-            if(lists == null)
-            {
-                throw new Exception("Any list not found");
-            }
-            return lists;
+            var lists = _context.Lists.Select(list => DtoTransformer.CreateMyListDto(list)).ToList();
 
+            if (lists == null)
+            {
+                throw new NullReferenceException("Any list not found");
+            }
+
+            return await Task.FromResult(lists);
         }
-        public async Task<MyList> GetListById(int id)
+
+        public async Task<MyListDto> GetListById(int id)
         {
             var list = _context.Lists.FirstOrDefault(l => l.Id == id);
 
-            if(list == null)
+            if (list == null)
             {
-                throw new Exception($"List with id: {id} not found.");
+                throw new NullReferenceException($"List with id: {id} not found.");
             }
 
-            return list;
+            var myListDto = DtoTransformer.CreateMyListDto(list);
+
+            return await Task.FromResult(myListDto);
         }
-        public async Task<int> CreateList(string name)
+
+        public async Task<int> CreateList(MyListDto newListDto)
         {
-            var newList = new MyList()
+            var newCreatedListDto = new MyListDto()
             {
-                Name = name
+                Id = newListDto.Id,
+                Name = newListDto.Name
             };
-       
 
-            _context.Lists.Add(newList);
-            _context.SaveChanges();
+            var newCreatedList = DtoTransformer.CreateMyListFromMyListDto(newCreatedListDto);
 
-            return newList.Id;
+            _context.Lists.Add(newCreatedList);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+
+            return newCreatedList.Id;
         }
 
-        public async Task<bool> ChangeListName(int id, string name)
+        public async Task<bool> EditList(int id, MyListDto newListDto)
         {
             var searchingList = _context.Lists.FirstOrDefault(l => l.Id == id);
 
             if (searchingList == null)
             {
-                throw new Exception($"List with id: {id} not found.");
+                throw new NullReferenceException($"List with id: {id} not found.");
             }
-                
-            searchingList.Name = name;
 
-            _context.SaveChanges();
+            searchingList.Id = newListDto.Id;
+            searchingList.Name = newListDto.Name;
+
+            try
+            {
+            await _context.SaveChangesAsync();
+
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
 
             return true;
-
         }
 
-        public async Task<bool> DeleteList (int id)
+        public async Task<bool> DeleteList(int id)
         {
             var searchingList = _context.Lists.FirstOrDefault(l => l.Id == id);
 
             if (searchingList == null)
             {
-                throw new Exception($"List with id: {id} not found.");
+                throw new NullReferenceException($"List with id: {id} not found.");
             }
+
             _context.Lists.Remove(searchingList);
-            _context.SaveChanges();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
 
             return true;
-
         }
     }
 }

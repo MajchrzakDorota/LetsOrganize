@@ -1,17 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using LetsOrganize.Entities;
 
-namespace LetsOrganize.Entities
+namespace LetsOrganize.Models
 {
-    public class Element
+    public class ElementDto
     {
         public int Id { get; set; }
-        [Required]
-        [MaxLength(30)]
         public string Name { get; set; }
         public float Quantity { get; set; }
         public string Unit { get; set; }
-
-        public MyList MyList { get; set; }
         public int MyListId { get; set; }
+
     }
 }

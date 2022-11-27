@@ -4,15 +4,13 @@ namespace LetsOrganize.Entities
 {
     public class LetsOrganizeDbContext : DbContext
     {
-        public LetsOrganizeDbContext(DbContextOptions<LetsOrganizeDbContext> options): base(options)
-        {
-
-        }
-
         public DbSet<MyList> Lists { get; set; }
         public DbSet<Element> Elements { get; set; }
+        public DbSet<User> Users { get; set; }
 
-
+        public LetsOrganizeDbContext(DbContextOptions<LetsOrganizeDbContext> options) : base(options)
+        {
+        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,7 +34,7 @@ namespace LetsOrganize.Entities
                      new Element { MyListId = 1, Id = 1, Name = "Apples", Quantity = 1, Unit = "kg" },
                      new Element { MyListId = 1, Id = 2, Name = "Potatoes", Quantity = 3, Unit = "kg" });
             });
-                
+
         }
     }
 }

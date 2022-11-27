@@ -1,104 +1,126 @@
 ﻿using LetsOrganize.Entities;
+using LetsOrganize.Interfaces;
+using LetsOrganize.Models;
+using LetsOrganize.Utils;
+using Microsoft.EntityFrameworkCore;
 
 namespace LetsOrganize.Services
 {
-    public interface IElementService
-    {
-        Task<IEnumerable<Element>> GetAllElementFromList(int listId);
-        Task<int> AddElementToList(int id, Element element);
-        Task<bool> EditElement(int id, Element element);
-        Task<bool> DeleteElementFromList(int elementId);
-        Task<bool> DeleteAllElementsFromList(int id);
-    }
     public class ElementService : IElementService
     {
         private readonly LetsOrganizeDbContext _context;
-        public ElementService(LetsOrganizeDbContext context)
+        private readonly ILogger<ElementService> _logger;
+
+        public ElementService(LetsOrganizeDbContext context, ILogger<ElementService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
-        public async Task<IEnumerable<Element>> GetAllElementFromList(int listId)
+        public Task<IEnumerable<ElementDto>> GetAllElementsFromList(int listId)
         {
-            var listOfElements = _context.Elements.Where(e => e.MyListId == listId).ToList();
+            var listOfElementsDto = _context.Elements.Where(e => e.MyListId == listId).Select(element => DtoTransformer.CreateElementDto(element)).AsEnumerable();
 
-            if(listOfElements == null)
-            {
-                throw new Exception("This list is empty");
-            }
-
-            return listOfElements;
+            return Task.FromResult(listOfElementsDto);
         }
 
-        public async Task<int> AddElementToList(int id, Element element)
+        public async Task<int> AddElementToList(int id, ElementDto elementDto)
         {
             var searchingList = _context.Lists.Where(l => l.Id == id);
 
-            if(searchingList == null)
+            if (searchingList == null)
             {
-                throw new Exception($"List with id: {id} Not Found");
+                throw new NullReferenceException($"List with id: {id} Not Found");
             }
 
-            var newElement = new Element()
-            {
-                MyListId = id,
-                Name = element.Name,
-                Unit = element.Unit,
-                Quantity = element.Quantity
-            };
+            var newElement = DtoTransformer.CreateElementFromElementDto(elementDto);
 
             _context.Elements.Add(newElement);
-            _context.SaveChanges();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
 
             return newElement.Id;
-            
         }
-        public async Task<bool> EditElement(int id, Element element)
+
+        public async Task<bool> EditElement(int id, ElementDto elementDto)
         {
             var elementToEdit = _context.Elements.FirstOrDefault(e => e.Id == id);
 
-            if(elementToEdit == null)
+            if (elementToEdit == null)
             {
-                throw new Exception("Element not found");
+                throw new NullReferenceException("Element not found");
             }
 
-            elementToEdit.Name = element.Name;
+            elementToEdit.Name = elementDto.Name;
+            elementToEdit.Unit = elementDto.Unit;
+            elementToEdit.Quantity = elementDto.Quantity;
+            elementToEdit.MyListId = elementDto.MyListId;
 
-            _context.SaveChanges();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
 
             return true;
         }
 
         public async Task<bool> DeleteElementFromList(int elementId)
         {
-            
+
             var element = _context.Elements.FirstOrDefault(e => e.Id == elementId);
 
-            if(element == null)
+            if (element == null)
             {
-                throw new Exception($"Element with id: {elementId} not found");
+                throw new NullReferenceException($"Element with id: {elementId} not found");
             }
 
-            _context.Elements.Remove(element);       
-            _context.SaveChanges();
-            return true;
+            _context.Elements.Remove(element);
 
+            try
+            {
+                await _context.SaveChangesAsync();
+
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+
+            return true;
         }
 
         public async Task<bool> DeleteAllElementsFromList(int id)
         {
             var searchingList = _context.Elements.Where(l => l.MyListId == id);
 
-            if( searchingList == null)
+            if (searchingList == null)
             {
-                throw new Exception("This list is empty");
+                throw new NullReferenceException($"List with id: {id} does not exist");
             }
+
             _context.RemoveRange(searchingList);
-            _context.SaveChanges();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
 
             return true;
         }
-
-
     }
 }
